@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "shaka-player/dist/controls.css";
 import { parseClearKeys, streamUrl, type Channel } from "@/lib/channels";
 
@@ -151,10 +151,16 @@ export default function ShakaPlayer({ channel }: { channel: Channel }) {
         fadeDelay: 0,
       });
 
+      // Smart DRM: only apply ClearKey to DASH (MPD) streams with valid keys.
+      // HLS (.m3u8) streams don't use ClearKey — applying it causes error 6002.
+      const url = streamUrl(channel);
+      const isHls = url.includes(".m3u8");
+      const keys = parseClearKeys(channel.clearkey as never);
+      const hasKeys = Object.keys(keys).length > 0;
+
       player.configure({
-        drm: { clearKeys: parseClearKeys(channel.clearkey as never) },
+        drm: { clearKeys: (!isHls && hasKeys) ? keys : {} },
         streaming: {
-          // Keep a healthy cushion of video ahead so short network dips don't cause buffering.
           bufferingGoal: 45,
           rebufferingGoal: 4,
           bufferBehind: 30,
@@ -167,7 +173,6 @@ export default function ShakaPlayer({ channel }: { channel: Channel }) {
           retryParameters: { maxAttempts: 6, baseDelay: 400, backoffFactor: 1.6, timeout: 15000, stallTimeout: 8000 },
         },
         manifest: {
-          // Stay a bit further behind the live edge ΓÇö playing right at the edge causes constant stalls.
           defaultPresentationDelay: 20,
           retryParameters: { maxAttempts: 5, baseDelay: 400, timeout: 15000 },
         },
@@ -177,7 +182,7 @@ export default function ShakaPlayer({ channel }: { channel: Channel }) {
           switchInterval: 4,
           bandwidthDowngradeTarget: 0.9,
           bandwidthUpgradeTarget: 0.8,
-          restrictToElementSize: true, // don't fetch 1080p into a small phone screen
+          restrictToElementSize: true,
         },
       });
 
@@ -200,7 +205,7 @@ export default function ShakaPlayer({ channel }: { channel: Channel }) {
       });
 
       try {
-        await player.load(streamUrl(channel));
+        await player.load(url);
         if (cancelled) return;
         setLoading(false);
         video.play().catch(() => {
@@ -210,10 +215,32 @@ export default function ShakaPlayer({ channel }: { channel: Channel }) {
       } catch (e: any) {
         if (cancelled) return;
         const code = e?.code;
+
+        // DRM error 6002 = license rejected. Retry WITHOUT ClearKey —
+        // the stream may be unencrypted, or the keys expired/wrong.
+        if (code === 6002 && hasKeys && !isHls) {
+          console.warn(`[ShakaPlayer] ClearKey failed for "${channel.name}" — retrying without DRM`);
+          try {
+            player.configure({ drm: { clearKeys: {} } });
+            await player.load(url);
+            if (cancelled) return;
+            setLoading(false);
+            video.play().catch(() => {
+              video.muted = true;
+              video.play().catch(() => {});
+            });
+            return;
+          } catch {
+            // retry also failed — fall through to error
+          }
+        }
+
         setError(
           code === 1001
             ? "The stream server refused the request (it may be region-locked or the token expired)."
-            : `Couldn't load stream (code ${code ?? "?"})`,
+            : code === 6002
+              ? "DRM key rejected — this channel may need updated keys."
+              : `Couldn't load stream (code ${code ?? "?"})`,
         );
         setLoading(false);
       }
