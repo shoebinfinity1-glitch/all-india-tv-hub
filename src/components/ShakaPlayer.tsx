@@ -1,21 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import "shaka-player/dist/controls.css";
 import { parseClearKeys, streamUrl, type Channel } from "@/lib/channels";
-
-/** CDN hosts that need the Android TV proxy to avoid 403 on desktop browsers. */
-const CDN_RE = /jio\.com|akamaized\.net|cloudfront\.net|jiocinema\.com/;
-
-/** Route a CDN URL through our server-side proxy so it gets Android TV headers. */
-function proxyUrl(originalUrl: string): string {
-  try {
-    // Don't re-wrap URLs that are already proxied
-    if (originalUrl.startsWith("/api/proxy") || originalUrl.includes("/api/proxy")) return originalUrl;
-    if (!CDN_RE.test(originalUrl)) return originalUrl;
-    return `/api/proxy?url=${encodeURIComponent(originalUrl)}`;
-  } catch {
-    return originalUrl;
-  }
-}
 
 function tokenOf(ch: Channel): string | null {
   const cookie = ch.headers?.cookie ?? ch.headers?.Cookie ?? "";
@@ -159,7 +144,7 @@ export default function ShakaPlayer({ channel }: { channel: Channel }) {
       await player.attach(video);
       ui = new shaka.ui.Overlay(player, container, video);
       ui.configure({
-        // Fewer buttons in the bar so nothing gets squeezed on phones; extras live in the ⋮ settings menu.
+        // Fewer buttons in the bar so nothing gets squeezed on phones; extras live in the Γï« settings menu.
         controlPanelElements: ["play_pause", "mute", "volume", "spacer", "quality", "language", "overflow_menu", "fullscreen"],
         overflowMenuButtons: ["captions", "playback_rate", "picture_in_picture", "quality", "language"],
         addSeekBar: true,
@@ -182,7 +167,7 @@ export default function ShakaPlayer({ channel }: { channel: Channel }) {
           retryParameters: { maxAttempts: 6, baseDelay: 400, backoffFactor: 1.6, timeout: 15000, stallTimeout: 8000 },
         },
         manifest: {
-          // Stay a bit further behind the live edge — playing right at the edge causes constant stalls.
+          // Stay a bit further behind the live edge ΓÇö playing right at the edge causes constant stalls.
           defaultPresentationDelay: 20,
           retryParameters: { maxAttempts: 5, baseDelay: 400, timeout: 15000 },
         },
@@ -196,23 +181,17 @@ export default function ShakaPlayer({ channel }: { channel: Channel }) {
         },
       });
 
-      // Route ALL CDN requests through our server-side proxy.
-      // The proxy adds Android TV User-Agent + Referer headers that JioTV CDN requires.
-      // Without this, desktop browsers get 403 because:
-      //   1. They send a desktop Chrome UA (CDN rejects)
-      //   2. They send the app domain as Referer (CDN rejects)
-      //   3. JS can't override User-Agent (browser "forbidden header")
+      // Add the access token to EVERY request (manifest + all segments), not just the first link.
       const token = tokenOf(channel);
-      player.getNetworkingEngine().registerRequestFilter((_type: number, req: { uris: string[] }) => {
-        req.uris = req.uris.map((u) => {
-          // Step 1: Append __hdnea__ token if missing
-          if (token && !u.includes("__hdnea__=") && CDN_RE.test(u)) {
-            u = u + (u.includes("?") ? "&" : "?") + "__hdnea__=" + token;
-          }
-          // Step 2: Route through server-side proxy for Android TV headers
-          return proxyUrl(u);
+      if (token) {
+        player.getNetworkingEngine().registerRequestFilter((_type: number, req: { uris: string[] }) => {
+          req.uris = req.uris.map((u) =>
+            u.includes("__hdnea__=") || !/jio\.com|akamaized\.net|cloudfront\.net/.test(u)
+              ? u
+              : u + (u.includes("?") ? "&" : "?") + "__hdnea__=" + token,
+          );
         });
-      });
+      }
 
       player.addEventListener("buffering", (e: any) => setLoading(!!e.buffering));
       player.addEventListener("error", (e: any) => {
@@ -221,7 +200,7 @@ export default function ShakaPlayer({ channel }: { channel: Channel }) {
       });
 
       try {
-        await player.load(proxyUrl(streamUrl(channel)));
+        await player.load(streamUrl(channel));
         if (cancelled) return;
         setLoading(false);
         video.play().catch(() => {
@@ -267,7 +246,7 @@ export default function ShakaPlayer({ channel }: { channel: Channel }) {
         title="Screen size (Z)"
         className="plugx-overlay absolute right-3 top-3 z-[5] rounded-full border border-border bg-background/60 px-3 py-1 text-xs font-semibold text-foreground backdrop-blur transition-all duration-300 hover:bg-primary hover:text-primary-foreground"
       >
-        ⤢ {MODES[mode]!.label}
+        Γñó {MODES[mode]!.label}
       </button>
       {toast && (
         <div className="pointer-events-none absolute left-1/2 top-1/2 z-[6] -translate-x-1/2 -translate-y-1/2 rounded-full border border-border bg-background/80 px-5 py-2 text-sm font-semibold shadow-xl backdrop-blur">
@@ -302,11 +281,11 @@ export default function ShakaPlayer({ channel }: { channel: Channel }) {
       ))}
       <button onClick={cycleBoost}
         className={`ml-auto rounded-full px-3 py-1 text-xs font-medium transition-all ${boost ? "bg-primary text-primary-foreground shadow-[0_0_16px_-4px_var(--primary)]" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}>
-        🔊 Boost {boost ? `${BOOSTS[boost]! * 100}%` : "off"}
+        ≡ƒöè Boost {boost ? `${BOOSTS[boost]! * 100}%` : "off"}
       </button>
     </div>
     <p className="mt-2 hidden text-[11px] text-muted-foreground sm:block">
-      Shortcuts: Space play · F fullscreen · M mute · Z screen size · B boost · P picture-in-picture · ↑↓ volume
+      Shortcuts: Space play ┬╖ F fullscreen ┬╖ M mute ┬╖ Z screen size ┬╖ B boost ┬╖ P picture-in-picture ┬╖ ΓåæΓåô volume
     </p>
     </div>
   );
