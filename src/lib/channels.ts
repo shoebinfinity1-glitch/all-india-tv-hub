@@ -22,6 +22,7 @@ const ALLOWED_HOSTS = [
   "localhost",
   "127.0.0.1",
   "jiotvplusplugx.lovable.app",
+  "all-india-tv-hub.lovable.app",
   "id-preview--a9c03669-5259-4ff9-9faf-827b36d9b6a5.lovable.app",
 ];
 
