@@ -8,6 +8,8 @@ const CDN_RE = /jio\.com|akamaized\.net|cloudfront\.net|jiocinema\.com/;
 /** Route a CDN URL through our server-side proxy so it gets Android TV headers. */
 function proxyUrl(originalUrl: string): string {
   try {
+    // Don't re-wrap URLs that are already proxied
+    if (originalUrl.startsWith("/api/proxy") || originalUrl.includes("/api/proxy")) return originalUrl;
     if (!CDN_RE.test(originalUrl)) return originalUrl;
     return `/api/proxy?url=${encodeURIComponent(originalUrl)}`;
   } catch {
