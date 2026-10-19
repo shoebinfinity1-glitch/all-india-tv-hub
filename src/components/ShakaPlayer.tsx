@@ -2,6 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import "shaka-player/dist/controls.css";
 import { parseClearKeys, streamUrl, type Channel } from "@/lib/channels";
 
+/** CDN hosts that need the Android TV proxy to avoid 403 on desktop browsers. */
+const CDN_RE = /jio\.com|akamaized\.net|cloudfront\.net|jiocinema\.com/;
+
+/** Route a CDN URL through our server-side proxy so it gets Android TV headers. */
+function proxyUrl(originalUrl: string): string {
+  try {
+    if (!CDN_RE.test(originalUrl)) return originalUrl;
+    return `/api/proxy?url=${encodeURIComponent(originalUrl)}`;
+  } catch {
+    return originalUrl;
+  }
+}
+
 function tokenOf(ch: Channel): string | null {
   const cookie = ch.headers?.cookie ?? ch.headers?.Cookie ?? "";
   return cookie.match(/__hdnea__=([^;]+)/)?.[1] ?? null;
@@ -181,17 +194,23 @@ export default function ShakaPlayer({ channel }: { channel: Channel }) {
         },
       });
 
-      // Add the access token to EVERY request (manifest + all segments), not just the first link.
+      // Route ALL CDN requests through our server-side proxy.
+      // The proxy adds Android TV User-Agent + Referer headers that JioTV CDN requires.
+      // Without this, desktop browsers get 403 because:
+      //   1. They send a desktop Chrome UA (CDN rejects)
+      //   2. They send the app domain as Referer (CDN rejects)
+      //   3. JS can't override User-Agent (browser "forbidden header")
       const token = tokenOf(channel);
-      if (token) {
-        player.getNetworkingEngine().registerRequestFilter((_type: number, req: { uris: string[] }) => {
-          req.uris = req.uris.map((u) =>
-            u.includes("__hdnea__=") || !/jio\.com|akamaized\.net|cloudfront\.net/.test(u)
-              ? u
-              : u + (u.includes("?") ? "&" : "?") + "__hdnea__=" + token,
-          );
+      player.getNetworkingEngine().registerRequestFilter((_type: number, req: { uris: string[] }) => {
+        req.uris = req.uris.map((u) => {
+          // Step 1: Append __hdnea__ token if missing
+          if (token && !u.includes("__hdnea__=") && CDN_RE.test(u)) {
+            u = u + (u.includes("?") ? "&" : "?") + "__hdnea__=" + token;
+          }
+          // Step 2: Route through server-side proxy for Android TV headers
+          return proxyUrl(u);
         });
-      }
+      });
 
       player.addEventListener("buffering", (e: any) => setLoading(!!e.buffering));
       player.addEventListener("error", (e: any) => {
@@ -200,7 +219,7 @@ export default function ShakaPlayer({ channel }: { channel: Channel }) {
       });
 
       try {
-        await player.load(streamUrl(channel));
+        await player.load(proxyUrl(streamUrl(channel)));
         if (cancelled) return;
         setLoading(false);
         video.play().catch(() => {
