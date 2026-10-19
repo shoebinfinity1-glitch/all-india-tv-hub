@@ -1,0 +1,69 @@
+{
+  "source": "code-archive",
+  "archive": "plugx-portal-magic-main_1.zip",
+  "capabilities": [
+    {
+      "capability": "application code and routes",
+      "source": "React and TanStack Start application in the uploaded ZIP",
+      "outcome": "Migrate the live channel catalogue, streaming player, programme guide, and chat helper, with the requested All india Tv branding.",
+      "status": "in_progress",
+      "next_action": "Port into the existing TanStack Start project and verify the preview."
+    },
+    {
+      "capability": "database schema and records",
+      "source": "No database schema or record export detected; application reads its channel list from an external feed.",
+      "outcome": "No application database or stored records to migrate.",
+      "status": "not_applicable",
+      "next_action": null
+    },
+    {
+      "capability": "authentication identities and authorization",
+      "source": "No sign-in or user/role authorization flow detected.",
+      "outcome": "No application accounts or access rules to migrate.",
+      "status": "not_applicable",
+      "next_action": null
+    },
+    {
+      "capability": "uploaded file bytes and bundled assets",
+      "source": "No user-uploaded storage or application media files detected; channel logos and programme artwork come from external feeds.",
+      "outcome": "No stored file bytes to transfer.",
+      "status": "not_applicable",
+      "next_action": null
+    },
+    {
+      "capability": "external providers and integrations",
+      "source": "Premium PlugX channel feed, JioTV programme guide, Telegram invite, Rebix chat endpoint, and Lovable AI Gateway fallback.",
+      "outcome": "Preserve existing provider connections and app behavior.",
+      "status": "pending_verification",
+      "next_action": "Verify available feed, guide, Telegram, and chat paths in the preview."
+    },
+    {
+      "capability": "public endpoints, callbacks, webhooks, and schedules",
+      "source": "No external webhook, callback, scheduled job, or stable public API contract detected; internal server functions call the providers above.",
+      "outcome": "No external callers or schedules to cut over.",
+      "status": "not_applicable",
+      "next_action": null
+    },
+    {
+      "capability": "secrets and credentials",
+      "source": "The AI fallback reads Lovable's managed LOVABLE_API_KEY; no user-owned secret or credential export was detected.",
+      "outcome": "Keep the managed AI Gateway fallback; do not request credentials.",
+      "status": "pending_verification",
+      "next_action": "Confirm the chat fallback is available in the preview."
+    },
+    {
+      "capability": "cutover",
+      "source": "Existing project name and source links in application content.",
+      "outcome": "Use All india Tv in the preview; do not change the source streaming or support provider URLs.",
+      "status": "pending_verification",
+      "next_action": "Verify visible branding and preview pages."
+    },
+    {
+      "capability": "verification",
+      "source": "Migrated preview application.",
+      "outcome": "Build, route, feed availability, and representative page behavior have not yet been checked.",
+      "status": "pending",
+      "next_action": "Run project tests and inspect the live preview."
+    }
+  ]
+}
